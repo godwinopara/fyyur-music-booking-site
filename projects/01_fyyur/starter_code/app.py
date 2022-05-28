@@ -24,7 +24,7 @@ app.config.from_object('config')
 db = SQLAlchemy(app)
 
 # TODO: connect to a local postgresql database
-migrate = Migrate(app,db)
+migrate = Migrate
 #----------------------------------------------------------------------------#
 # Models.
 #----------------------------------------------------------------------------#
@@ -104,28 +104,71 @@ def index():
 def venues():
   # TODO: replace with real venues data.
   #       num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
-  data=[{
-    "city": "San Francisco",
-    "state": "CA",
-    "venues": [{
-      "id": 1,
-      "name": "The Musical Hop",
-      "num_upcoming_shows": 0,
-    }, {
-      "id": 3,
-      "name": "Park Square Live Music & Coffee",
-      "num_upcoming_shows": 1,
-    }]
-  }, {
-    "city": "New York",
-    "state": "NY",
-    "venues": [{
-      "id": 2,
-      "name": "The Dueling Pianos Bar",
-      "num_upcoming_shows": 0,
-    }]
-  }]
-  return render_template('pages/venues.html', areas=data);
+
+  ## QUERY ALL THE VENUES DATA FROM THE DATABASE
+  all_venues = Venue.query.order_by(Venue.id).all()
+
+  current_date = datetime.now()
+
+  ## where all the data for the venue page will be stored
+  data = []
+
+  # store all the locations of the venues in a set to avoid duplicates
+  # because different venues can be available in a single location
+
+  unique_location = set()
+
+  # loop through all the venues to seperate venues based
+  # on their locations
+
+  for venue in all_venues:
+  
+    unique_location.add((venue.city, venue.state))
+
+  # by default items inside a set are sorted
+  # so we need the data to not be sorted so we need to
+  # convert it to a list so we can use the sort function to reverse it
+
+  sorted_unique_location = list(unique_location)
+  # sort the items in reverse order
+  sorted_unique_location.sort(reverse=True)
+
+  # loop through all the venue locations and distinguish
+  # every venue based on its locations 
+  for location in sorted_unique_location:
+
+    # A list to store the venues of a single location
+    venue_list = []
+
+    # Loop Through all the rows in the Venue model Table
+    for venue in all_venues:
+      # since we are looping through every location stored in the sorted_unique_location
+      # so we can differenciate every venue based on locations therefore 
+      # for every current venue in the loop we will check if the current location which is stored in a turple
+      # eg('San francisco', 'CA') will match the current venue.city and venue.state
+      if venue.city == location[0] and venue.state == location[1]:
+        # set a count variable for upcoming variables
+        count_upcoming_shows = 0
+
+        # filter the show based on the current venue id
+        shows = Show.query.filter(Show.venue_id == venue.id)
+        for s in shows:
+          # increase the upcoming show count if the current date is greater than the startdate
+          if current_date > s.start_time:
+            count_upcoming_shows += 1
+
+        venue_list.append({
+          "id":venue.id, 
+          "name": venue.name,
+          "num_upcoming_shows": count_upcoming_shows
+          })
+
+    data.append({
+      "city": location[0],
+      "state": location[1],
+      "venues": venue_list
+    })
+  return render_template('pages/venues.html', areas=data)
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
@@ -146,84 +189,65 @@ def search_venues():
 def show_venue(venue_id):
   # shows the venue page with the given venue_id
   # TODO: replace with real venue data from the venues table, using venue_id
-  data1={
-    "id": 1,
-    "name": "The Musical Hop",
-    "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
-    "address": "1015 Folsom Street",
-    "city": "San Francisco",
-    "state": "CA",
-    "phone": "123-123-1234",
-    "website": "https://www.themusicalhop.com",
-    "facebook_link": "https://www.facebook.com/TheMusicalHop",
-    "seeking_talent": True,
-    "seeking_description": "We are on the lookout for a local artist to play every two weeks. Please call us.",
-    "image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60",
-    "past_shows": [{
-      "artist_id": 4,
-      "artist_name": "Guns N Petals",
-      "artist_image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80",
-      "start_time": "2019-05-21T21:30:00.000Z"
-    }],
-    "upcoming_shows": [],
-    "past_shows_count": 1,
-    "upcoming_shows_count": 0,
+
+  # Get the Venue detail by the venue id 
+  venues = Venue.query.get(venue_id)
+
+  # Get all the show from the database
+  shows = Show.query.all()
+
+  current_time = datetime.today()
+
+  past_shw = [] # An array that hold all the past shows
+  upcoming_shw = [] # An array that hold all upcoming shows
+  
+  # Loop Through every row in the Show Model table
+  for show in shows:
+
+    # For every row in the Show Model Table 
+    # Find the venue id that matches the venue_id on the url_parameter from the show model Table
+    if show.venue_id == venue_id:
+      # on the show table every artist that has a show is on the same row with the 
+      # venue where the show will take place
+      # Therefore if found a venue id the matches the url_parameter then get the artist_id 
+      artist = Artist.query.get(show.artist_id)
+      # put the shows that are upcoming to the upcoming_show array
+      if show.start_time > current_time:
+        upcoming_shw.append({
+          "artist_id": artist.id,
+          "artist_name": artist.name,
+          "artist_image_link": artist.image_link,
+          "start_time": format_datetime(str(show.start_time))
+        })
+      else:
+      # put the show that already took place in the past_shows array
+        past_shw.append({
+          "artist_id": artist.id,
+          "artist_name": artist.name,
+          "artist_image_link": artist.image_link,
+          "start_time": format_datetime(str(show.start_time))
+        })
+
+
+  data = {
+    "id": venues.id,
+    "name": venues.name,
+    "genres": venues.genres,
+    "city": venues.city,
+    "state": venues.state,
+    "phone": venues.phone,
+    "website": venues.website,
+    "facebook_link": venues.facebook_link,
+    "seeking_talent": venues.seeking_talent,
+    "seeking_description": venues.seeking_description,
+    "image_link": venues.image_link,
+    "past_shows": past_shw,
+    "upcoming_shows": upcoming_shw,
+    "past_shows_count": len(past_shw),
+    "upcoming_shows_count": len(upcoming_shw),
   }
-  data2={
-    "id": 2,
-    "name": "The Dueling Pianos Bar",
-    "genres": ["Classical", "R&B", "Hip-Hop"],
-    "address": "335 Delancey Street",
-    "city": "New York",
-    "state": "NY",
-    "phone": "914-003-1132",
-    "website": "https://www.theduelingpianos.com",
-    "facebook_link": "https://www.facebook.com/theduelingpianos",
-    "seeking_talent": False,
-    "image_link": "https://images.unsplash.com/photo-1497032205916-ac775f0649ae?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=750&q=80",
-    "past_shows": [],
-    "upcoming_shows": [],
-    "past_shows_count": 0,
-    "upcoming_shows_count": 0,
-  }
-  data3={
-    "id": 3,
-    "name": "Park Square Live Music & Coffee",
-    "genres": ["Rock n Roll", "Jazz", "Classical", "Folk"],
-    "address": "34 Whiskey Moore Ave",
-    "city": "San Francisco",
-    "state": "CA",
-    "phone": "415-000-1234",
-    "website": "https://www.parksquarelivemusicandcoffee.com",
-    "facebook_link": "https://www.facebook.com/ParkSquareLiveMusicAndCoffee",
-    "seeking_talent": False,
-    "image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
-    "past_shows": [{
-      "artist_id": 5,
-      "artist_name": "Matt Quevedo",
-      "artist_image_link": "https://images.unsplash.com/photo-1495223153807-b916f75de8c5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=334&q=80",
-      "start_time": "2019-06-15T23:00:00.000Z"
-    }],
-    "upcoming_shows": [{
-      "artist_id": 6,
-      "artist_name": "The Wild Sax Band",
-      "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-      "start_time": "2035-04-01T20:00:00.000Z"
-    }, {
-      "artist_id": 6,
-      "artist_name": "The Wild Sax Band",
-      "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-      "start_time": "2035-04-08T20:00:00.000Z"
-    }, {
-      "artist_id": 6,
-      "artist_name": "The Wild Sax Band",
-      "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-      "start_time": "2035-04-15T20:00:00.000Z"
-    }],
-    "past_shows_count": 1,
-    "upcoming_shows_count": 1,
-  }
-  data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]
+
+
   return render_template('pages/show_venue.html', venue=data)
 
 #  Create Venue
