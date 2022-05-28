@@ -175,13 +175,34 @@ def search_venues():
   # TODO: implement search on venues with partial string search. Ensure it is case-insensitive.
   # seach for Hop should return "The Musical Hop".
   # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
+
+  search_term = request.form.get('search_term')
+  venues = Venue.query.filter(Venue.name.ilike('%' + search_term + '%'))
+  shows = Show.query.all()
+  current_date = datetime.today()
+  data = []
+  count = 0
+
+
+  for venue in venues:
+    count += 1
+    upcoming_show_count = 0
+  
+
+    for show in shows:
+      if show.venue_id == venue.id:
+        if show.start_time > current_date:
+          upcoming_show_count += 1
+
+    data.append({
+      "id": venue.id,
+      "name": venue.name,
+      "num_upcoming_shows": upcoming_show_count,
+    })
+
   response={
-    "count": 1,
-    "data": [{
-      "id": 2,
-      "name": "The Dueling Pianos Bar",
-      "num_upcoming_shows": 0,
-    }]
+    "count": count,
+    "data": data
   }
   return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
 
@@ -263,10 +284,34 @@ def create_venue_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
 
-  # on successful db insert, flash success
-  flash('Venue ' + request.form['name'] + ' was successfully listed!')
+  form = VenueForm()
+
+  try:
+
+    venue = Venue(
+      name=form.name.data,
+      city=form.city.data,
+      state=form.state.data,
+      address=form.address.data,
+      phone=form.phone.data,
+      genres=form.genres.data,
+      website=form.website_link.data,
+      facebook_link=form.facebook_link.data,
+      seeking_talent=form.seeking_talent.data,
+      image_link=form.website_link.data
+    )
+
+    db.session.add(venue)
+    db.session.commit()
+
+    # on successful db insert, flash success
+    flash('Venue ' + request.form['name'] + ' was successfully listed!')
+  except:
+    db.session.rollback()
   # TODO: on unsuccessful db insert, flash an error instead.
-  # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
+    flash('An error occurred. Venue ' + form.name + ' could not be listed.')
+  finally:
+    db.session.close()
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
   return render_template('pages/home.html')
 
