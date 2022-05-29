@@ -5,7 +5,7 @@
 import json
 import dateutil.parser
 import babel
-from flask import Flask, render_template, request, Response, flash, redirect, url_for
+from flask import Flask, render_template, request, Response, flash, redirect, url_for, jsonify
 from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import ARRAY 
@@ -204,7 +204,7 @@ def search_venues():
     "count": count,
     "data": data
   }
-  return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
+  return render_template('pages/search_venues.html', results=response)
 
 @app.route('/venues/<int:venue_id>')
 def show_venue(venue_id):
@@ -276,10 +276,13 @@ def show_venue(venue_id):
 
 @app.route('/venues/create', methods=['GET'])
 def create_venue_form():
+
   form = VenueForm()
+
   return render_template('forms/new_venue.html', form=form)
 
 @app.route('/venues/create', methods=['POST'])
+
 def create_venue_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
@@ -315,31 +318,44 @@ def create_venue_submission():
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
   return render_template('pages/home.html')
 
+
 @app.route('/venues/<venue_id>', methods=['DELETE'])
 def delete_venue(venue_id):
   # TODO: Complete this endpoint for taking a venue_id, and using
   # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
+  try:
+    venue = Venue.query.get(venue_id)
+    db.session.delete(venue)
+    # db.session.commit()
 
+    flash('Venue: ' + venue.name + ' was DELETED successfully!')
+  except:
+    db.session.rollback()
+
+    flash('Venue: ' + venue.name + ' was NOT DELETED an Error Occured!')
+  finally:
+    db.session.close()
+  
   # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
   # clicking that button delete it from the db then redirect the user to the homepage
-  return None
+  return jsonify({"success": True})
 
 #  Artists
 #  ----------------------------------------------------------------
 @app.route('/artists')
 def artists():
   # TODO: replace with real data returned from querying the database
-  data=[{
-    "id": 4,
-    "name": "Guns N Petals",
-  }, {
-    "id": 5,
-    "name": "Matt Quevedo",
-  }, {
-    "id": 6,
-    "name": "The Wild Sax Band",
-  }]
-  return render_template('pages/artists.html', artists=data)
+  # data=[{
+  #   "id": 4,
+  #   "name": "Guns N Petals",
+  # }, {
+  #   "id": 5,
+  #   "name": "Matt Quevedo",
+  # }, {
+  #   "id": 6,
+  #   "name": "The Wild Sax Band",
+  #}]
+  return render_template('pages/artists.html', artists=Artist.query.all())
 
 @app.route('/artists/search', methods=['POST'])
 def search_artists():
@@ -361,7 +377,7 @@ def show_artist(artist_id):
   # shows the artist page with the given artist_id
   # TODO: replace with real artist data from the artist table, using artist_id
   data1={
-    "id": 4,
+    "id": 1,
     "name": "Guns N Petals",
     "genres": ["Rock n Roll"],
     "city": "San Francisco",
@@ -383,7 +399,7 @@ def show_artist(artist_id):
     "upcoming_shows_count": 0,
   }
   data2={
-    "id": 5,
+    "id": 2,
     "name": "Matt Quevedo",
     "genres": ["Jazz"],
     "city": "New York",
@@ -403,7 +419,7 @@ def show_artist(artist_id):
     "upcoming_shows_count": 0,
   }
   data3={
-    "id": 6,
+    "id": 3,
     "name": "The Wild Sax Band",
     "genres": ["Jazz", "Classical"],
     "city": "San Francisco",
