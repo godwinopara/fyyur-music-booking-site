@@ -1,32 +1,39 @@
 from datetime import datetime
 
-def show_artist_details(Artist, Venue, Show, artist_id, format_datetime):
+def show_artist_details(Artist, Show, artist_id, format_datetime):
+
+    # Get the artist_id which information will be displayed
     artist = Artist.query.get(artist_id)
 
-    shows = Show.query.all()
-
+    # Get the current time
     current_date = datetime.now()
 
-    p_show = []
-    u_show = []
+    # Get the shows the artist have performed in and the venues
+    artist_shows = Show.query.join('artist').join('venue').filter(Show.artist_id == artist_id)
+    
 
-    for show in shows:
-        venue = Venue.query.get(show.venue_id)
-    if artist.id == show.artist_id:
-        if show.start_time > current_date:
-            u_show.append({
-            "venue_id": show.venue_id,
-            "venue_name": venue.name,
-            "venue_image_link": venue.image_link,
-            "start_time": format_datetime(str(show.start_time))
+    p_shows = [] # An array that hold past_shows
+    u_shows = [] # An array that hold upcoming_shows
+
+    # loop through all the shows the artist has performed in
+    for show in artist_shows:
+        
+        if show.start_time < current_date:
+            # added past shows to p_show list
+            p_shows.append({
+                "venue_id": show.id,
+                "venue_name": show.venue.name,
+                "venue_image_link": show.venue.image_link,
+                "start_time": format_datetime(str(show.start_time))
             })
-    else:
-        p_show.append({
-        "venue_id": show.venue_id,
-        "venue_name": venue.name,
-        "venue_image_link": venue.image_link,
-        "start_time": format_datetime(str(show.start_time))
-        })
+        else:
+            # Add upcoming show to u_show list
+            u_shows.append({
+                "venue_id": show.id,
+                "venue_name": show.venue.name,
+                "venue_image_link": show.venue.image_link,
+                "start_time": format_datetime(str(show.start_time))
+            })
 
     return {
     "id": artist.id,
@@ -40,8 +47,8 @@ def show_artist_details(Artist, Venue, Show, artist_id, format_datetime):
     "seeking_venue": artist.seeking_venue,
     "seeking_description": artist.seeking_description,
     "image_link": artist.image_link,
-    "past_shows": p_show,
-    "upcoming_shows": u_show,
-    "past_shows_count": len(p_show),
-    "upcoming_shows_count": len(u_show),
+    "past_shows": p_shows,
+    "upcoming_shows": u_shows,
+    "past_shows_count": len(p_shows),
+    "upcoming_shows_count": len(u_shows),
     }

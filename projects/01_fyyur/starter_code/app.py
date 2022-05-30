@@ -2,15 +2,13 @@
 # Imports
 #----------------------------------------------------------------------------#
 
-from http.client import ResponseNotReady
 import json
-from urllib import response
 import dateutil.parser
 import babel
 from flask import Flask, render_template, request, Response, flash, redirect, url_for, jsonify
 from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.dialects.postgresql import ARRAY 
+from sqlalchemy.dialects.postgresql import ARRAY
 import logging
 from logging import Formatter, FileHandler
 from flask_wtf import FlaskForm
@@ -32,7 +30,7 @@ app.config.from_object('config')
 db = SQLAlchemy(app)
 
 # TODO: connect to a local postgresql database
-migrate = Migrate
+migrate = Migrate(app, db)
 #----------------------------------------------------------------------------#
 # Models.
 #----------------------------------------------------------------------------#
@@ -111,7 +109,7 @@ def index():
 @app.route('/venues')
 def venues():
   # TODO: replace with real venues data.
-  #       num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
+  # num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
 
   ## QUERY ALL THE VENUES DATA FROM THE DATABASE
   all_venues = Venue.query.order_by(Venue.id).all()
@@ -125,6 +123,7 @@ def venues():
   # because different venues can be available in a single location
 
   unique_location = set()
+
 
   # loop through all the venues to seperate venues based
   # on their locations
@@ -193,7 +192,7 @@ def search_venues():
 
   # search_db is an helper_function i created that takes a model and the users search query i.e :
   # (user input on search bar) and search the table to find results that matches the user search query
-  response = search_db(Venue, search_term)
+  response = search_db(Venue, search_term, Show)
 
   return render_template('pages/search_venues.html', results=response)
 
@@ -202,9 +201,14 @@ def show_venue(venue_id):
   # shows the venue page with the given venue_id
   # TODO: replace with real venue data from the venues table, using venue_id
 
-  response = show_venue_details(Venue,Artist,Show, venue_id, format_datetime)
+  # show_venue_details is a function that display the details of a venue
+  # when a user clicks on a selected venue they want to view
+  # you can find the function implementation on the showTable folder
+  data = show_venue_details(Venue,Show, venue_id, format_datetime)
 
-  return render_template('pages/show_venue.html', venue=response)
+  return render_template('pages/show_venue.html', venue=data)
+
+
 
 #  Create Venue
 #  ----------------------------------------------------------------
@@ -215,6 +219,7 @@ def create_venue_form():
   form = VenueForm()
 
   return render_template('forms/new_venue.html', form=form)
+
 
 @app.route('/venues/create', methods=['POST'])
 
@@ -257,15 +262,16 @@ def create_venue_submission():
 
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
+
 def delete_venue(venue_id):
   # TODO: Complete this endpoint for taking a venue_id, and using
   # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
 
-
   try:
     venue = Venue.query.get(venue_id)
+
     db.session.delete(venue)
-    # db.session.commit()
+    db.session.commit()
 
     flash('Venue: ' + venue.name + ' was DELETED successfully!')
   except:
@@ -287,6 +293,7 @@ def delete_venue(venue_id):
 #  ----------------------------------------------------------------
 @app.route('/artists')
 def artists():
+
   # TODO: replace with real data returned from querying the database
 
   data=Artist.query.all()
@@ -300,16 +307,23 @@ def search_artists():
   # search for "band" should return "The Wild Sax Band".
 
   search_term = request.form.get('search_term', '')
-  response = search_db(Artist, search_term)
+
+  # search_db is a function that takes the user input on the search bar
+  # and search for artist names similar to the input
+  response = search_db(Artist, search_term, Show)
 
   return render_template('pages/search_artists.html', results=response)
 
 @app.route('/artists/<int:artist_id>')
+
 def show_artist(artist_id):
   # shows the artist page with the given artist_id
   # TODO: replace with real artist data from the artist table, using artist_id
 
-  data = show_artist_details(Artist, Venue, Show, artist_id, format_datetime)
+  # show_artist_details is a function that display the details of an artist
+  # when a user clicks on a selected artist they want to view
+  # you can find the function implementation on the showTable folder
+  data = show_artist_details(Artist, Show, artist_id, format_datetime)
 
   return render_template('pages/show_artist.html', artist=data)
 
@@ -374,7 +388,10 @@ def edit_artist_submission(artist_id):
   return redirect(url_for('show_artist', artist_id=artist_id))
 
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
+
 def edit_venue(venue_id):
+
+  # TODO: populate form with values from venue with ID <venue_id>
 
   form = VenueForm()
 
@@ -394,8 +411,8 @@ def edit_venue(venue_id):
     "seeking_description": venue.seeking_description,
     "image_link": venue.image_link,
   }
-  # TODO: populate form with values from venue with ID <venue_id>
   return render_template('forms/edit_venue.html', form=form, venue=venue_data)
+
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
@@ -449,10 +466,17 @@ def create_artist_submission():
   form = ArtistForm()
   
   try:
-    artist = Artist(name=form.name.data, genres=form.genres.data, city=form.city.data, 
-                    state=form.state.data,phone=form.phone.data, website=form.website_link.data, 
-                    facebook_link=form.facebook_link.data,seeking_venue=form.seeking_venue.data, 
-                    seeking_description=form.seeking_description.data,image_link=form.image_link.data)
+    artist = Artist(
+      name=form.name.data, 
+      genres=form.genres.data, 
+      city=form.city.data, 
+      state=form.state.data,
+      phone=form.phone.data, 
+      website=form.website_link.data, 
+      facebook_link=form.facebook_link.data,
+      seeking_venue=form.seeking_venue.data, 
+      seeking_description=form.seeking_description.data,
+      image_link=form.image_link.data)
       
     db.session.add(artist)
     db.session.commit()
@@ -477,14 +501,12 @@ def shows():
   data = []
 
   for show in shows:
-    venue = Venue.query.get(show.venue_id)
-    artist = Artist.query.get(show.artist_id)
 
     data.append({
       "venue_id": show.venue_id,
-      "venue_name": venue.name,
+      "venue_name": show.venue.name,
       "artist_id" : show.artist_id,
-      "artist_image_link": artist.image_link,
+      "artist_image_link": show.artist.image_link,
       "start_time": format_datetime(str(show.start_time))
     })
 
