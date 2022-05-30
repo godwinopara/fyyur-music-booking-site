@@ -1,6 +1,6 @@
 from datetime import datetime
 
-def show_all_venue(venue_table, artist_table, show_table, venue_id, format_datetime): 
+def show_venue_details(venue_table, artist_table, show_table, venue_id, format_datetime): 
   # Get the Venue detail by the venue id 
     venues = venue_table.query.get(venue_id)
 
