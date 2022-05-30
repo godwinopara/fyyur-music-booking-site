@@ -14,6 +14,11 @@ from logging import Formatter, FileHandler
 from flask_wtf import FlaskForm
 from forms import *
 from flask_migrate import Migrate
+
+#----------------------------------------
+# Helper Functions
+from show_Table.show_venue import show_all_venue
+from helper_func import *
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
@@ -176,34 +181,14 @@ def search_venues():
   # seach for Hop should return "The Musical Hop".
   # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
 
+  # get the user search query(user input on search bar)
+
   search_term = request.form.get('search_term')
-  venues = Venue.query.filter(Venue.name.ilike('%' + search_term + '%'))
-  shows = Show.query.all()
-  current_date = datetime.today()
-  data = []
-  count = 0
 
+  # search_db is an helper_function i created that takes a model and the users search query i.e :
+  # (user input on search bar) and search the table to find results that matches the user search query
+  response = search_db(Venue, search_term)
 
-  for venue in venues:
-    count += 1
-    upcoming_show_count = 0
-  
-
-    for show in shows:
-      if show.venue_id == venue.id:
-        if show.start_time > current_date:
-          upcoming_show_count += 1
-
-    data.append({
-      "id": venue.id,
-      "name": venue.name,
-      "num_upcoming_shows": upcoming_show_count,
-    })
-
-  response={
-    "count": count,
-    "data": data
-  }
   return render_template('pages/search_venues.html', results=response)
 
 @app.route('/venues/<int:venue_id>')
@@ -211,65 +196,9 @@ def show_venue(venue_id):
   # shows the venue page with the given venue_id
   # TODO: replace with real venue data from the venues table, using venue_id
 
-  # Get the Venue detail by the venue id 
-  venues = Venue.query.get(venue_id)
+  res = show_all_venue(Venue,Artist,Show, venue_id, format_datetime)
 
-  # Get all the show from the database
-  shows = Show.query.all()
-
-  current_time = datetime.today()
-
-  past_shw = [] # An array that hold all the past shows
-  upcoming_shw = [] # An array that hold all upcoming shows
-  
-  # Loop Through every row in the Show Model table
-  for show in shows:
-
-    # For every row in the Show Model Table 
-    # Find the venue id that matches the venue_id on the url_parameter from the show model Table
-    if show.venue_id == venue_id:
-      # on the show table every artist that has a show is on the same row with the 
-      # venue where the show will take place
-      # Therefore if found a venue id the matches the url_parameter then get the artist_id 
-      artist = Artist.query.get(show.artist_id)
-      # put the shows that are upcoming to the upcoming_show array
-      if show.start_time > current_time:
-        upcoming_shw.append({
-          "artist_id": artist.id,
-          "artist_name": artist.name,
-          "artist_image_link": artist.image_link,
-          "start_time": format_datetime(str(show.start_time))
-        })
-      else:
-      # put the show that already took place in the past_shows array
-        past_shw.append({
-          "artist_id": artist.id,
-          "artist_name": artist.name,
-          "artist_image_link": artist.image_link,
-          "start_time": format_datetime(str(show.start_time))
-        })
-
-
-  data = {
-    "id": venues.id,
-    "name": venues.name,
-    "genres": venues.genres,
-    "city": venues.city,
-    "state": venues.state,
-    "phone": venues.phone,
-    "website": venues.website,
-    "facebook_link": venues.facebook_link,
-    "seeking_talent": venues.seeking_talent,
-    "seeking_description": venues.seeking_description,
-    "image_link": venues.image_link,
-    "past_shows": past_shw,
-    "upcoming_shows": upcoming_shw,
-    "past_shows_count": len(past_shw),
-    "upcoming_shows_count": len(upcoming_shw),
-  }
-
-
-  return render_template('pages/show_venue.html', venue=data)
+  return render_template('pages/show_venue.html', venue=res)
 
 #  Create Venue
 #  ----------------------------------------------------------------
@@ -345,37 +274,30 @@ def delete_venue(venue_id):
 @app.route('/artists')
 def artists():
   # TODO: replace with real data returned from querying the database
-  # data=[{
-  #   "id": 4,
-  #   "name": "Guns N Petals",
-  # }, {
-  #   "id": 5,
-  #   "name": "Matt Quevedo",
-  # }, {
-  #   "id": 6,
-  #   "name": "The Wild Sax Band",
-  #}]
-  return render_template('pages/artists.html', artists=Artist.query.all())
+
+  data=Artist.query.all()
+
+  return render_template('pages/artists.html', artists=data)
 
 @app.route('/artists/search', methods=['POST'])
 def search_artists():
   # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
   # seach for "A" should return "Guns N Petals", "Matt Quevado", and "The Wild Sax Band".
   # search for "band" should return "The Wild Sax Band".
-  response={
-    "count": 1,
-    "data": [{
-      "id": 4,
-      "name": "Guns N Petals",
-      "num_upcoming_shows": 0,
-    }]
-  }
-  return render_template('pages/search_artists.html', results=response, search_term=request.form.get('search_term', ''))
+
+  search_term = request.form.get('search_term', '')
+  response = search_db(Artist, search_term)
+
+  return render_template('pages/search_artists.html', results=response)
 
 @app.route('/artists/<int:artist_id>')
 def show_artist(artist_id):
   # shows the artist page with the given artist_id
   # TODO: replace with real artist data from the artist table, using artist_id
+
+
+  d = displayTableContents(Artist, artist_id)
+
   data1={
     "id": 1,
     "name": "Guns N Petals",
@@ -448,7 +370,7 @@ def show_artist(artist_id):
     "upcoming_shows_count": 3,
   }
   data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
-  return render_template('pages/show_artist.html', artist=data)
+  return render_template('pages/show_artist.html', artist=d)
 
 #  Update
 #  ----------------------------------------------------------------
