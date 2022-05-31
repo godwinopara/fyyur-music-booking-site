@@ -112,69 +112,42 @@ def venues():
   # num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
 
   ## QUERY ALL THE VENUES DATA FROM THE DATABASE
-  all_venues = Venue.query.order_by(Venue.id).all()
+  all_venues = Venue.query.all()
 
   current_date = datetime.now()
 
   ## where all the data for the venue page will be stored
   data = []
 
-  # store all the locations of the venues in a set to avoid duplicates
-  # because different venues can be available in a single location
+  unique_cities = {} # an dictionary the stores the cities to avoid querying a duplicate city  
 
-  unique_location = set()
+  # add every cities to the unique_cities dictionary to remove duplicate
+  for location in all_venues:
+    unique_cities[location.city] = location.state
 
 
-  # loop through all the venues to seperate venues based
-  # on their locations
+  for city, state in unique_cities.items():
 
-  for venue in all_venues:
-  
-    unique_location.add((venue.city, venue.state))
+    venues = []
 
-  # by default items inside a set are sorted
-  # so we need the data to not be sorted so we need to
-  # convert it to a list so we can use the sort function to reverse it
+    for  venue in all_venues:
 
-  sorted_unique_location = list(unique_location)
-  # sort the items in reverse order
-  sorted_unique_location.sort(reverse=True)
+      if city == venue.city:
 
-  # loop through all the venue locations and distinguish
-  # every venue based on its locations 
-  for location in sorted_unique_location:
-
-    # A list to store the venues of a single location
-    venue_list = []
-
-    # Loop Through all the rows in the Venue model Table
-    for venue in all_venues:
-      # since we are looping through every location stored in the sorted_unique_location
-      # so we can differenciate every venue based on locations therefore 
-      # for every current venue in the loop we will check if the current location which is stored in a turple
-      # eg('San francisco', 'CA') will match the current venue.city and venue.state
-      if venue.city == location[0] and venue.state == location[1]:
-        # set a count variable for upcoming variables
-        count_upcoming_shows = 0
-
-        # filter the show based on the current venue id
-        shows = Show.query.filter(Show.venue_id == venue.id)
-        for s in shows:
-          # increase the upcoming show count if the current date is greater than the startdate
-          if current_date > s.start_time:
-            count_upcoming_shows += 1
-
-        venue_list.append({
-          "id":venue.id, 
+        venues.append({
+          "id": venue.id,
           "name": venue.name,
-          "num_upcoming_shows": count_upcoming_shows
-          })
+          "num_upcoming_shows": Show.query.filter(Show.venue_id == venue.id).filter(current_date > Show.start_time).count()
+        })
 
-    data.append({
-      "city": location[0],
-      "state": location[1],
-      "venues": venue_list
-    })
+    data.append(({
+      "city": city,
+      "state": state,
+      "venues": venues
+    }))
+    
+
+
   return render_template('pages/venues.html', areas=data)
 
 
